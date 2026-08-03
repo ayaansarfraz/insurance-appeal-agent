@@ -14,10 +14,15 @@
 import { NextResponse } from 'next/server';
 
 import { reconcile } from '@/lib/agent';
+import {
+  auditCitations,
+  isExplanationTrustworthy,
+  mayGenerateLetter,
+} from '@/lib/citation-guard';
 import { nearestFirePerimeter } from '@/lib/fire-data';
 import { fetchParcelFields, geocode } from '@/lib/mireye';
 import { renderAppealLetter } from '@/lib/letter-template';
-import type { AppealRequest, AppealResponse } from '@/lib/types';
+import type { AppealRequest, AppealResponse, ReconciliationResult } from '@/lib/types';
 
 export async function POST(request: Request) {
   let body: AppealRequest;
@@ -48,13 +53,35 @@ export async function POST(request: Request) {
   const fireHistory = await nearestFirePerimeter(coordinates);
   const reconciliation = await reconcile(parcel, fireHistory, insurerStatedReason);
 
+  // Every claim the reasoning step produced is checked against the sources we
+  // actually fetched before any of it reaches a letter. See lib/citation-guard.ts
+  // for why this is a permanent part of the pipeline and not a stub guard.
+  const audit = auditCitations(reconciliation, parcel, fireHistory);
+  const checkedReconciliation: ReconciliationResult = {
+    ...reconciliation,
+    supportingFacts: audit.verifiedFacts,
+  };
+
+  let letter: string | null = null;
+  let letterWithheldReason: string | null = null;
+
+  if (checkedReconciliation.mismatchFound) {
+    const verdict = mayGenerateLetter(reconciliation, audit);
+    if (verdict.allowed) {
+      letter = renderAppealLetter(parcel, fireHistory, checkedReconciliation);
+    } else {
+      letterWithheldReason = verdict.reason ?? 'Letter withheld by citation checking.';
+    }
+  }
+
   const response: AppealResponse = {
     parcel,
     fireHistory,
-    reconciliation,
-    letter: reconciliation.mismatchFound
-      ? renderAppealLetter(parcel, fireHistory, reconciliation)
-      : null,
+    reconciliation: checkedReconciliation,
+    letter,
+    letterWithheldReason,
+    explanationTrusted: isExplanationTrustworthy(reconciliation),
+    rejectedFacts: audit.rejectedFacts,
   };
 
   return NextResponse.json(response);

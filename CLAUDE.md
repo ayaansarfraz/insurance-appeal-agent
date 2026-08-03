@@ -212,6 +212,36 @@ Maintain a fixed list of 5-10 real addresses in `/data/demo-addresses.ts`, mixin
   Flipped to `expectedMismatch: false`. Lesson: verify a demo address's notes
   against `firesWithinRadius` output before trusting them, including notes
   written by an earlier session.
+- **The pipeline produced a self-contradicting appeal letter, and only running
+  it caught it.** With `lib/agent.ts` still a stub, a live request for the
+  Paradise parcel returned a letter whose section 3 said "This parcel falls
+  inside the recorded perimeter of the Camp Fire of 2018" and whose section 4
+  said "Nearest recorded fire perimeter is 7.3 miles away and dates to 2017",
+  citing a source that does not exist, alongside a defensible-space claim for a
+  field Mireye does not even publish. It typechecked and built cleanly the whole
+  time. Fix: `lib/citation-guard.ts`, which checks every supporting fact's
+  citation against the sources actually fetched for that parcel and refuses to
+  render a letter otherwise. Keep it after the agent is real — inventing a
+  plausible citation is a failure mode language models have natively, not a
+  property of the stub.
+- **Blocking the letter was not enough; the verdict banner leaked the same
+  fabrication.** First version of the guard stopped the document but left the
+  UI rendering the unverified explanation as a headline conclusion: "The stated
+  reason is not supported by this parcel", directly above a card correctly
+  showing the parcel is inside the Camp Fire perimeter. Hence
+  `explanationTrusted` on `AppealResponse` and a neutral "No verdict yet" state
+  in the UI. Rule of thumb: any surface that can state a conclusion needs the
+  check, not just the one that produces a file.
+- **Never run `npm run build` while `npm run dev` is running.** The production
+  build overwrites `.next/` underneath the dev server, which then 500s on every
+  request with `ENOENT ... _buildManifest.js.tmp.*`. This looks exactly like a
+  broken page: Playwright reported zero inputs, zero buttons, empty DOM. Fix is
+  `pkill -f "next dev"; rm -rf .next` and restart, not debugging the app.
+- **`npm run lint` was linting `.next/` and reporting 4,631 problems.** The
+  script was a bare `eslint` with no scope, so it walked generated output. Now
+  scoped to `eslint app lib data scripts`, against which the project is clean.
+  Also note `cmd | tail && echo PASS` reports tail's exit status, not the
+  command's — it will print PASS over a failing lint run.
 - **`ReconciliationResult.mismatchFound` being a boolean is a real limitation.**
   Oxnard is genuinely "the insurer is right about the area, and your parcel is
   still flat and fuel-free". The contract cannot express partial credit. Left

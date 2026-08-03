@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint app lib data scripts",
     "typecheck": "tsc --noEmit",
     "verify:fire": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/verify-fire-data.mjs",
     "build:fire": "node scripts/build-fire-perimeters.mjs",
