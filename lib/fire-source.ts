@@ -9,10 +9,11 @@
  * module lets the client render it without dragging fs into the browser
  * bundle.
  *
- * NOTE FOR AGENT A: FireHistoryCheck in the frozen contract carries no source
- * or fetchedAt of its own, so any supportingFact you build from fire history
- * should cite FIRE_PERIMETER_SOURCE.source and FIRE_PERIMETER_SOURCE.fetchedAt
- * verbatim. Import them from here rather than retyping the strings.
+ * This module stays the single definition of the provenance strings even
+ * though FireHistoryCheck now carries source and fetchedAt of its own:
+ * nearestFirePerimeter populates those fields from FIRE_PERIMETER_SOURCE, so
+ * the values are defined once here and the type guarantees they travel with
+ * every result. Update the citation in one place, this one.
  */
 
 export interface DatasetProvenance {

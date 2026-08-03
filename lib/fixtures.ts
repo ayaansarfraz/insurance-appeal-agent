@@ -43,6 +43,8 @@ export const fixtureFireHistory: FireHistoryCheck = {
   nearestPerimeterDistanceMiles: 7.3,
   nearestPerimeterYear: 2017,
   perimeterName: 'FIXTURE — Tubbs Fire (placeholder)',
+  source: 'FIXTURE — placeholder, not a real citation',
+  fetchedAt: FETCHED_AT,
 };
 
 export const fixtureReconciliation: ReconciliationResult = {

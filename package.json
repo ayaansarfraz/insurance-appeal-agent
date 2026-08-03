@@ -1,12 +1,15 @@
 {
-  "name": "scaffold",
+  "name": "insurance-appeal-agent",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "verify:fire": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/verify-fire-data.mjs",
+    "build:fire": "node scripts/build-fire-perimeters.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

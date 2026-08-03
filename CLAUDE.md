@@ -67,6 +67,8 @@ interface FireHistoryCheck {
   nearestPerimeterDistanceMiles: number;
   nearestPerimeterYear: number;
   perimeterName: string;
+  source: string;     // populate from FIRE_PERIMETER_SOURCE in lib/fire-source.ts
+  fetchedAt: string;  // ditto — do not retype the strings
 }
 
 interface ReconciliationResult {
@@ -135,6 +137,29 @@ Maintain a fixed list of 5-10 real addresses in `/data/demo-addresses.ts`, mixin
   citation belongs to the dataset rather than to an individual query. If the
   contract is ever unfrozen, adding citation fields to `FireHistoryCheck` is the
   cleaner fix.
+  **RESOLVED same day, see the amendment entry below.**
+
+### 2026-08-03 (main: contract amendment after merging Agent B)
+
+- **`FireHistoryCheck` now carries `source` and `fetchedAt`.** The freeze existed
+  to stop two parallel agents churning a shared contract, and Agent A had not
+  started yet, so the amendment was free at that moment and would not have been
+  a week later. `lib/fire-source.ts` remains the single definition of the
+  provenance strings and `nearestFirePerimeter` populates the new fields from
+  `FIRE_PERIMETER_SOURCE`. The values are still defined in exactly one place;
+  the type now guarantees they travel with every result, so a fire-history claim
+  cannot reach the letter uncited. Update the citation in `fire-source.ts` only.
+- **Timing rule this illustrates:** a frozen contract is only worth its cost
+  while more than one stream is writing against it. When exactly one stream is
+  live, amend it immediately rather than accumulating workarounds around it.
+- **`package.json` was named `scaffold`.** `create-next-app` refuses to run in a
+  non-empty directory, so Phase 0 scaffolded into a temp dir and copied the
+  result in, which carried that directory's name across. Renamed to
+  `insurance-appeal-agent`.
+- **`scripts/verify-fire-data.mjs` needs the TS resolve hook.** Running it as
+  plain `node scripts/verify-fire-data.mjs` fails with `ERR_MODULE_NOT_FOUND` on
+  the extensionless `./fire-source` import. Use `npm run verify:fire`, which
+  passes `--experimental-strip-types --import ./scripts/ts-resolve.mjs`.
 - **Node cannot resolve extensionless TS imports; python here has no CA bundle.**
   Two small detours. Running app `.ts` modules under `node
   --experimental-strip-types` needs the resolve hook in

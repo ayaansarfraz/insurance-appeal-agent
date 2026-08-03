@@ -29,6 +29,13 @@ export interface FireHistoryCheck {
   nearestPerimeterDistanceMiles: number;
   nearestPerimeterYear: number;
   perimeterName: string;
+  /** Provenance of the perimeter dataset this result was derived from. Carried
+   *  on the result itself so a fire-history claim cannot reach the letter
+   *  uncited, the same guarantee CitedField gives Mireye values. The canonical
+   *  values live in lib/fire-source.ts: populate these from
+   *  FIRE_PERIMETER_SOURCE rather than retyping the strings. */
+  source: string;
+  fetchedAt: string;
 }
 
 export interface ReconciliationResult {

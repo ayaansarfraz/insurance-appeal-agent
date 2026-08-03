@@ -24,7 +24,7 @@ import pointToLineDistance from '@turf/point-to-line-distance';
 import { lineString, point } from '@turf/helpers';
 import type { Feature, MultiPolygon, Polygon, Position } from 'geojson';
 
-import { SEARCH_RADIUS_MILES } from './fire-source';
+import { FIRE_PERIMETER_SOURCE, SEARCH_RADIUS_MILES } from './fire-source';
 import type { FireHistoryCheck } from './types';
 
 interface PerimeterProperties {
@@ -194,6 +194,8 @@ export async function nearestFirePerimeter(
     nearestPerimeterDistanceMiles: Math.round(best.miles * 10) / 10,
     nearestPerimeterYear: best.feature.properties.year ?? 0,
     perimeterName: `${best.feature.properties.name} Fire`,
+    source: FIRE_PERIMETER_SOURCE.source,
+    fetchedAt: FIRE_PERIMETER_SOURCE.fetchedAt,
   };
 }
 
