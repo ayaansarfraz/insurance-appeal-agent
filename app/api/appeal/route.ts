@@ -2,10 +2,12 @@
  * POST /api/appeal — runs the full pipeline: address + insurer reason in,
  * cited reconciliation and appeal letter out.
  *
- * OWNER: Agent A, exclusively. Agent B calls this endpoint but must not edit
- * this file. It currently wires the Phase 0 stubs together, so it already
- * returns a correctly shaped AppealResponse and the UI can be built against it
- * before any real integration exists.
+ * OWNER: Agent A, exclusively.
+ *
+ * The route no longer decides what to fetch. It hands the address and the
+ * stated reason to the agent, which chooses its own evidence and returns both
+ * the facts it gathered and the conclusion it drew. The route's remaining job
+ * is to check that conclusion before publishing it.
  *
  * Runs server-side so MIREYE_API_KEY and ANTHROPIC_API_KEY never reach the
  * client.
@@ -13,16 +15,14 @@
 
 import { NextResponse } from 'next/server';
 
-import { reconcile } from '@/lib/agent';
-import {
-  auditCitations,
-  isExplanationTrustworthy,
-  mayGenerateLetter,
-} from '@/lib/citation-guard';
-import { nearestFirePerimeter } from '@/lib/fire-data';
-import { fetchParcelFields, geocode } from '@/lib/mireye';
+import { runAppealAgent } from '@/lib/agent';
+import { auditCitations, isExplanationTrustworthy, mayGenerateLetter } from '@/lib/citation-guard';
 import { renderAppealLetter } from '@/lib/letter-template';
 import type { AppealRequest, AppealResponse, ReconciliationResult } from '@/lib/types';
+
+/** The agent makes several sequential model calls with tool use in between, so
+ *  this runs well past the default serverless timeout on Vercel. */
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   let body: AppealRequest;
@@ -40,22 +40,20 @@ export async function POST(request: Request) {
     );
   }
 
-  // TODO(Agent A): the preset choice belongs to the agent, driven by the
-  // insurer's stated reason, not hardcoded here. Lands on
-  // feat/agent-reconciliation.
-  const geocoded = await geocode(address);
-  const coordinates = { lat: geocoded.lat, lng: geocoded.lng };
-  const { parcel } = await fetchParcelFields(
-    geocoded.normalizedAddress ?? address,
-    coordinates,
-    ['wildfire_underwrite'],
-  );
-  const fireHistory = await nearestFirePerimeter(coordinates);
-  const reconciliation = await reconcile(parcel, fireHistory, insurerStatedReason);
+  let run;
+  try {
+    run = await runAppealAgent(address.trim(), insurerStatedReason.trim());
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'The assessment failed.';
+    console.error('[appeal] agent run failed:', message);
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 
-  // Every claim the reasoning step produced is checked against the sources we
-  // actually fetched before any of it reaches a letter. See lib/citation-guard.ts
-  // for why this is a permanent part of the pipeline and not a stub guard.
+  const { parcel, fireHistory, reconciliation, presetsChosen, toolCalls, unavailableFields } = run;
+
+  // Every claim the agent produced is checked against the sources actually
+  // fetched before any of it reaches a letter or a headline verdict. See
+  // lib/citation-guard.ts for why this stays now that the agent is real.
   const audit = auditCitations(reconciliation, parcel, fireHistory);
   const checkedReconciliation: ReconciliationResult = {
     ...reconciliation,
@@ -82,6 +80,9 @@ export async function POST(request: Request) {
     letterWithheldReason,
     explanationTrusted: isExplanationTrustworthy(reconciliation),
     rejectedFacts: audit.rejectedFacts,
+    presetsChosen,
+    toolCalls,
+    unavailableFields,
   };
 
   return NextResponse.json(response);

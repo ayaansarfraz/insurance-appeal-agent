@@ -88,4 +88,12 @@ export interface AppealResponse {
    *  before rendering. Surfaced rather than hidden: a populated array means the
    *  reasoning step is inventing sources and needs fixing. */
   rejectedFacts?: Array<{ claim: string; source: string; reason: string }>;
+  /** Field presets the agent decided to fetch. The claim that the agent picks
+   *  its own evidence rather than fetching everything is checkable here. */
+  presetsChosen?: string[];
+  /** Ordered tool names the agent called, so its path is visible. */
+  toolCalls?: string[];
+  /** Fields that could not be retrieved. Shown rather than dropped: a missing
+   *  slope reading is not a flat parcel. */
+  unavailableFields?: string[];
 }

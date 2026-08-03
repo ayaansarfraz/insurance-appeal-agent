@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "verify:fire": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/verify-fire-data.mjs",
     "build:fire": "node scripts/build-fire-perimeters.mjs",
-    "verify:mireye": "node --env-file=.env.local --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/verify-mireye.mjs"
+    "verify:mireye": "node --env-file=.env.local --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/verify-mireye.mjs",
+    "verify:agent": "node --env-file=.env.local --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/verify-agent.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

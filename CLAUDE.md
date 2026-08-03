@@ -242,6 +242,50 @@ Maintain a fixed list of 5-10 real addresses in `/data/demo-addresses.ts`, mixin
   scoped to `eslint app lib data scripts`, against which the project is clean.
   Also note `cmd | tail && echo PASS` reports tail's exit status, not the
   command's — it will print PASS over a failing lint run.
+### 2026-08-03 (Agent A: reconciliation agent live, 10/10 on the demo set)
+
+- **The agent scores 10/10 on verdicts with 0 citation failures.** `npm run
+  verify:agent` runs 4 representative parcels, `-- --all` runs all 10, and both
+  score against `expectedMismatch`. Run it after any prompt change: a prompt
+  edit that improves one parcel can quietly flip another.
+- **The Paradise trap is handled, and the prompt is what handles it.** The agent
+  now writes, unprompted per-parcel, that low canopy on a burned lot "is what a
+  parcel looks like after it has burned and while it is still rebuilding". It
+  also does the inverse check on clean parcels, confirming a benign vegetation
+  reading is genuine low fuel rather than a burn scar, before concluding for the
+  homeowner. That behaviour comes from the trap section in
+  `lib/agent-prompt.ts`. Do not trim it.
+- **Exposing `alarmDate` fixed a wrong verdict, and no prompt change could
+  have.** Santa Monica's insurer claimed "a major wildfire within two miles in
+  the last twelve months". The Palisades Fire is 1.4 miles away and the agent
+  called the insurer correct, because `firesWithinRadius` returned only `year`
+  and a 2025 fire looks recent. The extract has held `alarmDate` all along
+  (7,279 of 7,298 features): Palisades ignited 2025-01-07, nineteen months
+  before the current date. Exposing that field plus passing today's date into
+  the first user message moved the verdict to correct with precise reasoning.
+  Lesson: when the agent hedges about a fact ("the records give the year but not
+  the month"), check whether the data actually has it before rewriting the
+  prompt.
+- **The agent skipped Mireye entirely on one parcel.** For Santa Monica it went
+  geocode, fire history, submit, and concluded without ever fetching parcel
+  measurements, because the fire record looked decisive on its own. Parcel level
+  evidence is the entire product thesis, so the prompt now requires fetching the
+  preset matching the named hazard before concluding. Watch for this class of
+  shortcut whenever a tool is optional.
+- **Preset selection is real and observable.** Across all 10 parcels the agent
+  chose `wildfire_underwrite` only and never fetched the 13 `flood_risk` fields,
+  which is the cost-control claim in `PROJECT.md` demonstrated rather than
+  asserted. `presetsChosen` and `toolCalls` come back on the API response so it
+  is checkable in the demo.
+- **A manual tool loop, not the SDK tool runner.** The loop is about forty lines
+  and keeping it explicit makes the agent's preset choice observable. Append the
+  whole `response.content` array each turn, never just the text: adaptive
+  thinking blocks must be replayed unchanged on the same model, and dropping
+  `tool_use` blocks breaks pairing with their results.
+- **Route timeout.** A run makes several sequential model calls and takes 26 to
+  45 seconds. `app/api/appeal/route.ts` sets `maxDuration = 300`; without it
+  this will time out on Vercel.
+
 - **`ReconciliationResult.mismatchFound` being a boolean is a real limitation.**
   Oxnard is genuinely "the insurer is right about the area, and your parcel is
   still flat and fuel-free". The contract cannot express partial credit. Left
