@@ -36,14 +36,33 @@ import {
 } from './fire-source';
 import type { CitedField, FireHistoryCheck, ParcelFacts, ReconciliationResult } from './types';
 
+/** Mireye field keys that do not survive mechanical prettifying. Without these
+ *  the letter says "Lcms class" and "Ndvi current", which reads as a machine
+ *  dump rather than a document a person wrote. */
+const FIELD_LABELS: Record<string, string> = {
+  lcms_class: 'Dominant land cover class',
+  tree_canopy_pct: 'Tree canopy cover',
+  ndvi_current: 'Current vegetation index (NDVI)',
+  ndvi_change_5y: 'Change in vegetation index over 5 years',
+  slope_degrees: 'Ground slope',
+  elevation: 'Ground elevation',
+  wildfire_annual_frequency: 'Modelled annual wildfire frequency for the census tract',
+  within_floodplain_polygon: 'Inside a FEMA mapped floodplain',
+  coast_distance_m: 'Distance to the coast',
+  nearest_waterbody_name: 'Nearest named waterbody',
+  surface_water_permanence_pct: 'Surface water permanence',
+};
+
 /** camelCase or snake_case field keys into something a claims adjuster reads. */
 function humanizeFieldName(key: string): string {
+  const known = FIELD_LABELS[key];
+  if (known) return known;
   const spaced = key
     .replace(/[_-]+/g, ' ')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/\s+/g, ' ')
     .trim();
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 /** Mireye field values are typed unknown in the frozen contract, so render
@@ -71,7 +90,10 @@ function citation(source: string, fetchedAt: string): string {
 
 function fieldLine(key: string, field: CitedField): string {
   const confidence = field.confidence ? ` Reported confidence: ${field.confidence}.` : '';
-  return `  ${humanizeFieldName(key)}: ${formatValue(field.value)}. ${citation(field.source, field.fetchedAt)}${confidence}`;
+  // The unit is not decoration. "Elevation: 9.94" is not a claim an adjuster
+  // can check; "Elevation: 9.94 meters" is.
+  const unit = field.unit ? ` ${field.unit}` : '';
+  return `  ${humanizeFieldName(key)}: ${formatValue(field.value)}${unit}. ${citation(field.source, field.fetchedAt)}${confidence}`;
 }
 
 /** Plain sentence describing the nearest perimeter result, including the null
@@ -262,18 +284,26 @@ export function renderAppealLetter(
 
   // ---- 8. Sources -------------------------------------------------------
   push('APPENDIX: SOURCES CITED', '');
+  // Deduplicated on source name alone, not name plus timestamp: the same
+  // dataset read twice seconds apart is one source, and listing it twice makes
+  // the appendix look padded.
   const seen = new Set<string>();
-  const addSource = (source: string, fetchedAt: string) => {
-    const key = `${source}|${fetchedAt}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    push(`  - ${source}. Retrieved ${formatDate(fetchedAt)}.`);
+  const addSource = (source: string, fetchedAt: string, url?: string | null) => {
+    if (seen.has(source)) return;
+    seen.add(source);
+    // The URL is the point of the appendix. Naming a dataset tells the reader
+    // where the number came from; linking it lets them go and check.
+    push(`  - ${source}. Retrieved ${formatDate(fetchedAt)}.${url ? `\n    ${url}` : ''}`);
   };
   for (const [, field] of [...wildfireEntries, ...floodEntries]) {
-    addSource(field.source, field.fetchedAt);
+    addSource(field.source, field.fetchedAt, field.sourceUrl);
   }
   for (const fact of reconciliation.supportingFacts) addSource(fact.source, fact.fetchedAt);
-  addSource(FIRE_PERIMETER_SOURCE.source, FIRE_PERIMETER_SOURCE.fetchedAt);
+  addSource(
+    FIRE_PERIMETER_SOURCE.source,
+    FIRE_PERIMETER_SOURCE.fetchedAt,
+    FIRE_PERIMETER_SOURCE.sourceUrl,
+  );
   push(
     '',
     'This letter was prepared with an automated tool that retrieves parcel level data and',

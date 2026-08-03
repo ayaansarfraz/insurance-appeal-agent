@@ -146,13 +146,19 @@ export const demoAddresses: DemoAddress[] = [
     insurerStatedReason:
       'Frequent wildfire activity in the surrounding area over the past five years supports a ' +
       'substantial premium adjustment.',
-    expectedMismatch: true,
+    expectedMismatch: false,
     notes:
-      'The most interesting mismatch on the list, because the raw fire count looks damning: ' +
-      'eighteen perimeters within five miles. But they are small Santa Clara riverbottom grass ' +
-      'fires, the four most recent running 30 to 67 acres each. Frequency is real, severity is ' +
-      'not, and the parcel sits on a flat built out coastal plain. The agent has to reason ' +
-      'about fire size and fuel type, not just count perimeters, or it gets this one backwards.',
+      'CORRECTED 2026-08-03 against the committed extract. This was originally listed as a ' +
+      'mismatch on the theory that the nearby fires were all small riverbottom grass fires. ' +
+      'They are not. Twenty perimeters fall within five miles and three of them are major: ' +
+      'the Thomas Fire of 2017 at 281,791 acres and 4.4 miles, the Mountain Fire of 2024 at ' +
+      '19,902 acres and 4.0 miles, and the Maria Fire of 2019 at 10,043 acres and 4.8 miles. ' +
+      'The insurer said frequent wildfire activity in the surrounding area over the past five ' +
+      'years, and that is exactly what the record shows, so the flag stands. ' +
+      'Worth keeping for a second reason: the parcel itself still measures benign (slope 1.3 ' +
+      'degrees, tree canopy 1 percent, built out coastal plain). It is the case where ' +
+      'parcel level data and area history disagree and the area history is the one that ' +
+      'governs, which is the mirror image of the appeal this product usually writes.',
     approximateCoordinates: { lat: 34.22888, lng: -119.17264 },
   },
   {

@@ -213,29 +213,46 @@ export default function Home() {
       {/* ---------------- results ---------------- */}
       {result ? (
         <div className="mt-8 space-y-5">
-          {/* verdict */}
-          <section
-            className={`rounded-lg border p-4 ${
-              result.reconciliation.mismatchFound
-                ? 'border-sky-600/40 bg-sky-500/10'
-                : 'border-amber-600/40 bg-amber-500/10'
-            }`}
-          >
-            <h2 className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
-              {result.reconciliation.mismatchFound
-                ? 'The stated reason is not supported by this parcel'
-                : 'The stated reason is supported by this parcel'}
-            </h2>
-            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-neutral-800 dark:text-neutral-200">
-              {result.reconciliation.explanation}
-            </p>
-            {!result.reconciliation.mismatchFound ? (
-              <p className="mt-2 text-xs text-neutral-700 dark:text-neutral-300">
-                No appeal letter was generated, because there is nothing here to appeal. That is a
-                real result, not a failure.
+          {/* verdict — suppressed entirely when the explanation failed
+              verification. Showing an unverified conclusion in the page's most
+              prominent position is the same failure as writing it into a
+              letter. The cited data below still renders: it is real and is
+              worth reading on its own. */}
+          {result.explanationTrusted === false ? (
+            <section className="rounded-lg border border-neutral-300 bg-neutral-100/70 p-4 dark:border-neutral-700 dark:bg-neutral-900/60">
+              <h2 className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
+                No verdict yet for this parcel
+              </h2>
+              <p className="mt-1.5 text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">
+                The reasoning step has not run against live data, so this tool is not stating
+                whether the insurer&apos;s reason holds up. The cited measurements and fire history
+                below are real and were retrieved for this exact parcel. Read them directly.
               </p>
-            ) : null}
-          </section>
+            </section>
+          ) : (
+            <section
+              className={`rounded-lg border p-4 ${
+                result.reconciliation.mismatchFound
+                  ? 'border-sky-600/40 bg-sky-500/10'
+                  : 'border-amber-600/40 bg-amber-500/10'
+              }`}
+            >
+              <h2 className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
+                {result.reconciliation.mismatchFound
+                  ? 'The stated reason is not supported by this parcel'
+                  : 'The stated reason is supported by this parcel'}
+              </h2>
+              <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-neutral-800 dark:text-neutral-200">
+                {result.reconciliation.explanation}
+              </p>
+              {!result.reconciliation.mismatchFound ? (
+                <p className="mt-2 text-xs text-neutral-700 dark:text-neutral-300">
+                  No appeal letter was generated, because there is nothing here to appeal. That is a
+                  real result, not a failure.
+                </p>
+              ) : null}
+            </section>
+          )}
 
           {/* parcel identity */}
           <CitationCard title="Parcel of record" subtitle={result.parcel.address}>
@@ -370,6 +387,37 @@ export default function Home() {
               <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-md border border-neutral-200 bg-white p-4 font-mono text-[12.5px] leading-relaxed text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100">
                 {result.letter}
               </pre>
+            </section>
+          ) : result.letterWithheldReason ? (
+            /* A mismatch was found but citation checking blocked the letter. Say
+               so plainly: silently rendering nothing here would leave the user
+               staring at a verdict with no document and no explanation. */
+            <section className="rounded-lg border border-amber-300 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+              <h2 className="text-sm font-semibold tracking-tight text-amber-900 dark:text-amber-200">
+                No letter generated
+              </h2>
+              <p className="mt-1 text-xs leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+                {result.letterWithheldReason}
+              </p>
+              {result.rejectedFacts && result.rejectedFacts.length > 0 ? (
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                    Claims dropped because their citation could not be verified:
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {result.rejectedFacts.map((fact, i) => (
+                      <li
+                        key={i}
+                        className="text-xs leading-relaxed text-amber-900/80 dark:text-amber-200/80"
+                      >
+                        <span className="font-mono">{fact.claim}</span>
+                        <br />
+                        <span className="opacity-75">{fact.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </section>
           ) : null}
         </div>

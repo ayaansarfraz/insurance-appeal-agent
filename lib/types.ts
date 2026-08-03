@@ -16,6 +16,18 @@ export interface CitedField {
   source: string;
   fetchedAt: string;
   confidence: string;
+  /** Unit of measure, when the field has one ("degrees", "meters", "percent").
+   *  Optional because not every Mireye field is dimensioned. Render it with the
+   *  value: "slope 12.4" is ambiguous, "slope 12.4 degrees" is not. */
+  unit?: string | null;
+  /** Link to the underlying dataset. The premise of this project is that an
+   *  underwriter or regulator can independently re-fetch any cited value, and
+   *  that requires the URL, not just the dataset name. */
+  sourceUrl?: string | null;
+  /** Dataset edition the value came from, e.g. "3DEP 1/3 arc-second seamless
+   *  DEM". Distinct from fetchedAt: when the data was published, not when we
+   *  read it. */
+  datasetVintage?: string | null;
 }
 
 export interface ParcelFacts {
@@ -60,7 +72,20 @@ export interface AppealResponse {
   parcel: ParcelFacts;
   fireHistory: FireHistoryCheck | null;
   reconciliation: ReconciliationResult;
-  /** Rendered appeal letter. Null when no mismatch was found, since there is
-   *  nothing to appeal. */
+  /** Rendered appeal letter. Null when no mismatch was found (nothing to
+   *  appeal) or when citation checking withheld it, in which case
+   *  letterWithheldReason says why. */
   letter: string | null;
+  /** Why no letter was produced despite a mismatch. Null when a letter was
+   *  generated, or when none was warranted. */
+  letterWithheldReason?: string | null;
+  /** False when the reconciliation's explanation failed verification and must
+   *  not be displayed as a finding. The UI shows a neutral notice instead:
+   *  presenting an unverified conclusion is the same failure as writing it into
+   *  a letter, just in a different place on the page. */
+  explanationTrusted?: boolean;
+  /** Claims the agent made that failed citation checking and were dropped
+   *  before rendering. Surfaced rather than hidden: a populated array means the
+   *  reasoning step is inventing sources and needs fixing. */
+  rejectedFacts?: Array<{ claim: string; source: string; reason: string }>;
 }
