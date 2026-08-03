@@ -100,4 +100,54 @@ Maintain a fixed list of 5-10 real addresses in `/data/demo-addresses.ts`, mixin
 
 *(This section is a living log. Every time a bug, wrong assumption, API quirk, or wasted detour happens, add a dated entry here before ending the session. Keep entries short: what happened, what the fix or correct approach was. Future sessions should read this section before touching related code.)*
 
-- *(no entries yet — first session, add findings here as they come up)*
+### 2026-08-03 (Agent B: fire data, demo addresses, letter, UI)
+
+- **CAL FIRE's perimeter layer is EPSG:3857, not WGS84.** The FRAP service
+  (`California_Historic_Fire_Perimeters/FeatureServer/2`) serves Web Mercator
+  metres by default. turf.js assumes WGS84 degrees and will happily compute
+  distances from projected metres without throwing, producing numbers that look
+  plausible and are wrong by orders of magnitude. Fix: pass `outSR=4326` on the
+  ArcGIS query so the server reprojects. `lib/fire-data.ts` now also asserts at
+  load that sampled feature bboxes fall inside California's WGS84 bounding box,
+  so a future bad extract fails loudly instead of silently.
+- **Don't trust recalled "known" distances as test fixtures.** The first version
+  of `scripts/verify-fire-data.mjs` failed three landmark checks and looked like
+  a real projection bug. turf was right; the expected values were wrong from
+  memory (one of them was a driving distance, not a straight line). Recomputing
+  them from the WGS84 Vincenty inverse made everything pass. If a geospatial
+  test fails, verify the expectation before touching the code.
+- **Size numbers for the perimeter extract.** CA + 2006 onward is 7,331 features
+  and 10.5 MB raw from ArcGIS. After Douglas-Peucker at 0.0006 degrees and
+  rounding coordinates to 4 decimals, it is 7,298 features / 6.4 MB (1.5 MB
+  gzipped). Simplification error was measured against full resolution source
+  geometry: worst case 166 ft, most cases under 10 ft, against a reporting
+  granularity of 0.1 mile. Do not simplify harder without re-measuring.
+  `scripts/build-fire-perimeters.mjs` regenerates the file.
+- **Next traces `path.join(process.cwd(), 'data', ...)` automatically.** No
+  `outputFileTracingIncludes` entry was needed in `next.config.ts`; the
+  `.nft.json` for the appeal route already lists the geojson. Confirm with
+  `grep fire-perimeters .next/server/app/api/appeal/route.js.nft.json` after any
+  change to how the file is loaded.
+- **`FireHistoryCheck` in `lib/types.ts` carries no `source`/`fetchedAt`.** Every
+  other value in the pipeline does. Rather than edit the frozen contract, the
+  dataset provenance lives in `lib/fire-source.ts` as a constant that both the
+  server and the client import. That is arguably more correct anyway, since the
+  citation belongs to the dataset rather than to an individual query. If the
+  contract is ever unfrozen, adding citation fields to `FireHistoryCheck` is the
+  cleaner fix.
+- **Node cannot resolve extensionless TS imports; python here has no CA bundle.**
+  Two small detours. Running app `.ts` modules under `node
+  --experimental-strip-types` needs the resolve hook in
+  `scripts/ts-resolve.mjs`, and `urllib` fails SSL verification in this
+  environment so the download path shells out to `curl` (now just uses `fetch`).
+- **Demo address balance is 5 justified / 5 mismatch, verified against the real
+  extract.** Two of them are deliberately hard: Oxnard has 18 perimeters within
+  5 miles that are all small riverbottom grass fires (frequency real, severity
+  not), and Santa Monica has a 2025 megafire 1.4 miles away across dense urban
+  fabric. If the agent gets those two backwards it is counting perimeters rather
+  than reasoning about exposure.
+- **Letter audience: the insurer, not the DOI.** A CDI Request for Assistance
+  expects the carrier to have been contacted first, so the insurer letter is the
+  document that has to exist first, and it is the one with actual leverage. The
+  DOI complaint is the follow-on; `lib/letter-template.ts` header explains the
+  reasoning and the letter tells the homeowner that is the next step.
