@@ -52,3 +52,6 @@ data/cache/
 # editors
 .idea/
 .vscode/
+
+# Claude Code local state and agent worktrees
+.claude/
