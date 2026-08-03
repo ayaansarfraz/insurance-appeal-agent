@@ -160,6 +160,63 @@ Maintain a fixed list of 5-10 real addresses in `/data/demo-addresses.ts`, mixin
   plain `node scripts/verify-fire-data.mjs` fails with `ERR_MODULE_NOT_FOUND` on
   the extensionless `./fire-source` import. Use `npm run verify:fire`, which
   passes `--experimental-strip-types --import ./scripts/ts-resolve.mjs`.
+
+### 2026-08-03 (Agent A: live Mireye API verified)
+
+- **The base URL is `api.mireye.com`, not `api.mireye.ai`.** The `.ai` host does
+  not resolve at all (`curl: (6) Could not resolve host`). Docs are served from
+  `docs.mireye.ai`, which is where the wrong assumption in the Phase 0 stub came
+  from. Auth is `Authorization: Bearer $MIREYE_API_KEY`.
+- **Wire format is snake_case and carries more than the frozen contract
+  modelled.** Every field comes back as `{value, unit, source, source_url,
+  confidence, fetched_at, dataset_vintage, ttl_seconds, notes, status}`. The
+  `CitedField` assumption was close but not exact, so `lib/mireye.ts` is the
+  translation boundary: nothing above it sees snake_case. `unit` and
+  `source_url` were added to `CitedField` as optional fields — `unit` because
+  "slope 12.4" is ambiguous and "slope 12.4 degrees" is not, `source_url`
+  because the whole premise is that a regulator can re-fetch each citation.
+  `/v1/fetch` takes `{lat, lng, preset}` and also returns a `partial_failures`
+  array; a field with `status != "ok"` is dropped rather than cited.
+- **THE BIG ONE: Mireye's wildfire fields read BENIGN for a parcel inside the
+  deadliest wildfire perimeter in California history.** 6295 Skyway, Paradise
+  sits inside the 2018 Camp Fire perimeter and returns slope 1.28 degrees, tree
+  canopy 1 percent, NDVI 0.06, `lcms_class` "Barren or Impervious". Every
+  vegetation-derived signal is low *because the town burned down*. A reconciler
+  reading only `wildfire_underwrite` would confidently tell a Paradise homeowner
+  their insurer is wrong. The fire perimeter cross-reference is not a
+  nice-to-have second source, it is the thing that stops the product from being
+  catastrophically wrong, and the agent prompt must state that low vegetation
+  can mean recently burned rather than low hazard.
+- **`wildfire_annual_frequency` returned 0 for all four addresses sampled,
+  including Paradise.** It is the FEMA National Risk Index tract-level figure
+  and lives in the `natural_hazard` preset, not `wildfire_underwrite`. The plan
+  to use it as a stand-in for "the insurer's coarse model" does not work while
+  it reads zero next to a 153,000-acre burn scar. Do not cite it as evidence
+  either way until someone works out whether it is unpopulated for these tracts
+  or scaled differently.
+- **There is no defensible-space or WUI-distance field.** PROJECT.md assumes
+  "defensible space, distance to fuel/wildland-urban interface". The real
+  `wildfire_underwrite` preset is exactly six fields: `elevation`,
+  `slope_degrees`, `lcms_class`, `tree_canopy_pct`, `ndvi_current`,
+  `ndvi_change_5y`. Do not promise defensible space in the letter or the
+  submission narrative.
+- **`GET /v1/meta/fields` is worth reading before prompting the agent.** Each
+  field ships an `interpretation_hints` string written for exactly this use
+  case, e.g. slope: "Slope >15 degrees materially raises wildfire spread risk on
+  forested land." Feed these to the model rather than inventing thresholds.
+- **A demo address was mislabelled and the live data caught it.** 300 Esplanade
+  Dr, Oxnard was listed `expectedMismatch: true` on the stated basis that all
+  nearby fires were 30-67 acre grass fires. The committed extract says otherwise:
+  20 fires within 5 miles including Thomas 2017 (281,791 acres, 4.4 mi),
+  Mountain 2024 (19,902 acres, 4.0 mi) and Maria 2019 (10,043 acres, 4.8 mi).
+  Flipped to `expectedMismatch: false`. Lesson: verify a demo address's notes
+  against `firesWithinRadius` output before trusting them, including notes
+  written by an earlier session.
+- **`ReconciliationResult.mismatchFound` being a boolean is a real limitation.**
+  Oxnard is genuinely "the insurer is right about the area, and your parcel is
+  still flat and fuel-free". The contract cannot express partial credit. Left
+  as-is for the demo; worth raising as a known limitation rather than pretending
+  every case is binary.
 - **Node cannot resolve extensionless TS imports; python here has no CA bundle.**
   Two small detours. Running app `.ts` modules under `node
   --experimental-strip-types` needs the resolve hook in

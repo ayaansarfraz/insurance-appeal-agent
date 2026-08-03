@@ -36,9 +36,15 @@ export async function POST(request: Request) {
   }
 
   // TODO(Agent A): the preset choice belongs to the agent, driven by the
-  // insurer's stated reason, not hardcoded here.
-  const coordinates = await geocode(address);
-  const parcel = await fetchParcelFields(address, coordinates, ['wildfire_underwrite']);
+  // insurer's stated reason, not hardcoded here. Lands on
+  // feat/agent-reconciliation.
+  const geocoded = await geocode(address);
+  const coordinates = { lat: geocoded.lat, lng: geocoded.lng };
+  const { parcel } = await fetchParcelFields(
+    geocoded.normalizedAddress ?? address,
+    coordinates,
+    ['wildfire_underwrite'],
+  );
   const fireHistory = await nearestFirePerimeter(coordinates);
   const reconciliation = await reconcile(parcel, fireHistory, insurerStatedReason);
 

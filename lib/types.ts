@@ -16,6 +16,18 @@ export interface CitedField {
   source: string;
   fetchedAt: string;
   confidence: string;
+  /** Unit of measure, when the field has one ("degrees", "meters", "percent").
+   *  Optional because not every Mireye field is dimensioned. Render it with the
+   *  value: "slope 12.4" is ambiguous, "slope 12.4 degrees" is not. */
+  unit?: string | null;
+  /** Link to the underlying dataset. The premise of this project is that an
+   *  underwriter or regulator can independently re-fetch any cited value, and
+   *  that requires the URL, not just the dataset name. */
+  sourceUrl?: string | null;
+  /** Dataset edition the value came from, e.g. "3DEP 1/3 arc-second seamless
+   *  DEM". Distinct from fetchedAt: when the data was published, not when we
+   *  read it. */
+  datasetVintage?: string | null;
 }
 
 export interface ParcelFacts {
