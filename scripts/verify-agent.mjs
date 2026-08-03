@@ -61,6 +61,7 @@ for (const demo of targets) {
   console.log(
     `  verdict        : mismatchFound=${run.reconciliation.mismatchFound} (expected ${demo.expectedMismatch}) ${ok ? 'CORRECT' : '*** WRONG ***'}`,
   );
+  console.log(`  two sided      : partiallySupported=${Boolean(run.reconciliation.partiallySupported)}`);
   console.log(`  citations      : ${audit.verifiedFacts.length} verified, ${audit.rejectedFacts.length} rejected`);
   for (const r of audit.rejectedFacts) console.log(`     REJECTED: ${r.source} -- ${r.reason.slice(0, 90)}`);
   console.log(`  took           : ${seconds}s`);

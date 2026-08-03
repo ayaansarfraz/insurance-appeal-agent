@@ -29,11 +29,16 @@ import { FIRE_PERIMETER_SOURCE } from './fire-source';
 import { fetchParcelFields, geocode, type MireyePreset } from './mireye';
 import type { FireHistoryCheck, ParcelFacts, ReconciliationResult } from './types';
 
-const MODEL = 'claude-opus-5';
+const MODEL = 'claude-sonnet-5';
 
 /** Bounds a pathological loop. Ample: a normal run is geocode, one or two
  *  fetches, one or two fire lookups, then submit. */
 const MAX_TURNS = 12;
+
+/** How many times to push back on an empty supportingFacts array before giving
+ *  up and letting the citation guard handle it. One was not enough: the model
+ *  resubmitted empty on the second attempt and the loop accepted it. */
+const MAX_EMPTY_FACT_RETRIES = 3;
 
 export interface AgentRun {
   parcel: ParcelFacts;
@@ -109,7 +114,12 @@ const tools: Anthropic.Tool[] = [
         mismatchFound: {
           type: 'boolean',
           description:
-            'True when the insurer stated reason is not supported for this parcel. False when it holds up.',
+            'True when there is a basis to contest the decision as stated. False when the insurer stated reason holds up.',
+        },
+        partiallySupported: {
+          type: 'boolean',
+          description:
+            'True when the honest answer runs both ways and a bare verdict would misrepresent it, for example when the area fire history justifies the flag but the parcel itself measures benign, or when a specific claim is factually wrong while the underlying concern is real. Set this rather than forcing the conclusion to one side.',
         },
         explanation: {
           type: 'string',
@@ -118,7 +128,9 @@ const tools: Anthropic.Tool[] = [
         },
         supportingFacts: {
           type: 'array',
-          description: 'The specific sourced findings the conclusion rests on.',
+          minItems: 3,
+          description:
+            'The specific sourced findings the conclusion rests on, one measurement or record per entry, usually four to ten. Not a summary of the explanation but the evidence underneath it. Include findings that cut against your conclusion as well as those that support it. Never submit this empty.',
           items: {
             type: 'object',
             properties: {
@@ -134,7 +146,7 @@ const tools: Anthropic.Tool[] = [
           },
         },
       },
-      required: ['mismatchFound', 'explanation', 'supportingFacts'],
+      required: ['mismatchFound', 'partiallySupported', 'explanation', 'supportingFacts'],
     },
   },
 ];
@@ -183,6 +195,9 @@ export async function runAppealAgent(
   const presetsChosen: MireyePreset[] = [];
   const toolCalls: string[] = [];
   let reconciliation: ReconciliationResult | null = null;
+  /** Bounds the empty-supportingFacts retries below, so a model that insists on
+   *  an empty array cannot spin the loop to MAX_TURNS. */
+  let emptyFactRetries = 0;
 
   const messages: Anthropic.MessageParam[] = [
     {
@@ -280,9 +295,31 @@ export async function runAppealAgent(
 
       if (use.name === 'submit_reconciliation') {
         const input = use.input as Omit<ReconciliationResult, 'insurerStatedReason'>;
+
+        // Runtime backstop. The prompt asks for supporting facts and the schema
+        // sets minItems, but both are soft: the model has submitted an empty
+        // array in testing. A conclusion resting on nothing cannot be checked
+        // or cited, so it is refused once rather than accepted and blocked
+        // later by the citation guard with no explanation of why.
+        const facts = Array.isArray(input.supportingFacts) ? input.supportingFacts : [];
+        if (facts.length === 0 && emptyFactRetries < MAX_EMPTY_FACT_RETRIES) {
+          emptyFactRetries += 1;
+          results.push({
+            type: 'tool_result',
+            tool_use_id: use.id,
+            content:
+              'Rejected: supportingFacts was empty. Resubmit with the specific measurements and ' +
+              'records your conclusion rests on, each carrying the exact source string from the ' +
+              'tool result it came from.',
+            is_error: true,
+          });
+          continue;
+        }
+
         reconciliation = {
           insurerStatedReason,
           mismatchFound: Boolean(input.mismatchFound),
+          partiallySupported: Boolean(input.partiallySupported),
           explanation: String(input.explanation ?? ''),
           supportingFacts: Array.isArray(input.supportingFacts) ? input.supportingFacts : [],
         };

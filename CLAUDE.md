@@ -286,11 +286,41 @@ Maintain a fixed list of 5-10 real addresses in `/data/demo-addresses.ts`, mixin
   45 seconds. `app/api/appeal/route.ts` sets `maxDuration = 300`; without it
   this will time out on Vercel.
 
-- **`ReconciliationResult.mismatchFound` being a boolean is a real limitation.**
-  Oxnard is genuinely "the insurer is right about the area, and your parcel is
-  still flat and fuel-free". The contract cannot express partial credit. Left
-  as-is for the demo; worth raising as a known limitation rather than pretending
-  every case is binary.
+- **`ReconciliationResult.mismatchFound` being a boolean was a real limitation.**
+  RESOLVED: `partiallySupported` added, see the entry below.
+
+### 2026-08-03 (Agent A: partiallySupported, and two regressions it caused)
+
+- **`partiallySupported` is orthogonal to `mismatchFound`, not a third verdict.**
+  Either verdict can be two-sided. Oxnard is false + partial (the flag is
+  justified on the area's fire record, the parcel measures benign). Santa Monica
+  has run true + partial (the twelve month claim is wrong, the megafire is
+  real). Keeping them separate avoids a three-state enum that the letter and UI
+  would each have to re-derive.
+- **A prompt edit flipped Paradise to "appeal this", which is the worst possible
+  regression.** Adding the two-sided guidance interacted with the earlier rule
+  that a materially false specific claim is a mismatch. The insurer's Paradise
+  wording includes "elevated fuel loading", which is genuinely not borne out at
+  1 percent canopy, so the agent concluded the reason was contestable for a
+  parcel sitting inside the Camp Fire perimeter. The rule had no materiality
+  test. Fixed by asking what the decision actually rests on: if removing the
+  false claim leaves no stated reason standing it is a mismatch, and if the main
+  rationale is independently supported it is not. Both cases are written into
+  `lib/agent-prompt.ts` as worked examples. **Run `npm run verify:agent -- --all`
+  after every prompt change.** This is the second time an edit that improved one
+  parcel silently broke another.
+- **The agent submitted an empty `supportingFacts` array.** Prose conclusion,
+  zero evidence, which the citation guard would then block with no useful
+  explanation. Prompt asks for four to ten facts, the tool schema sets
+  `minItems: 3`, and `lib/agent.ts` refuses an empty array at runtime and asks
+  again. One retry was not enough, the model resubmitted empty; the bound is now
+  3. All ten parcels now return 7 to 9 facts. Treat schema `minItems` as a hint,
+  never as enforcement.
+- **`partiallySupported` is less stable across runs than `mismatchFound`.**
+  Verdicts have held at 10/10 over three consecutive full runs; the two-sided
+  flag has moved on Santa Monica between runs. It changes emphasis rather than
+  the recommendation, so it is not scored, but do not build anything that
+  assumes it is deterministic.
 - **Node cannot resolve extensionless TS imports; python here has no CA bundle.**
   Two small detours. Running app `.ts` modules under `node
   --experimental-strip-types` needs the resolve hook in

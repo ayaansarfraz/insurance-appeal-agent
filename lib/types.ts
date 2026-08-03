@@ -53,8 +53,26 @@ export interface FireHistoryCheck {
 export interface ReconciliationResult {
   insurerStatedReason: string;
   /** False is a real, expected outcome: on some demo parcels the insurer is
-   *  correct. The agent has to be able to say so. */
+   *  correct. The agent has to be able to say so.
+   *
+   *  Read this as the actionable bit: is there a basis to contest the decision
+   *  as stated. It is not a claim that the insurer is wrong about everything. */
   mismatchFound: boolean;
+  /** True when the honest answer runs both ways and a bare verdict would
+   *  misrepresent it.
+   *
+   *  Orthogonal to mismatchFound, because either verdict can be two-sided.
+   *  Oxnard: the flag is justified on the area's fire record while the parcel
+   *  itself measures benign (mismatchFound false, partiallySupported true).
+   *  Santa Monica: the insurer's twelve month claim is factually wrong but a
+   *  megafire really did burn 1.4 miles away (mismatchFound true,
+   *  partiallySupported true).
+   *
+   *  This exists because the agent kept producing two-sided conclusions that a
+   *  boolean flattened into a wrong headline. A homeowner told "your insurer is
+   *  wrong" who then discovers the area burned last year stops trusting the
+   *  tool, and rightly. */
+  partiallySupported?: boolean;
   explanation: string;
   supportingFacts: Array<{ claim: string; source: string; fetchedAt: string }>;
 }
