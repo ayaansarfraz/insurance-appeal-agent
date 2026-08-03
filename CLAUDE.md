@@ -242,11 +242,85 @@ Maintain a fixed list of 5-10 real addresses in `/data/demo-addresses.ts`, mixin
   scoped to `eslint app lib data scripts`, against which the project is clean.
   Also note `cmd | tail && echo PASS` reports tail's exit status, not the
   command's — it will print PASS over a failing lint run.
-- **`ReconciliationResult.mismatchFound` being a boolean is a real limitation.**
-  Oxnard is genuinely "the insurer is right about the area, and your parcel is
-  still flat and fuel-free". The contract cannot express partial credit. Left
-  as-is for the demo; worth raising as a known limitation rather than pretending
-  every case is binary.
+### 2026-08-03 (Agent A: reconciliation agent live, 10/10 on the demo set)
+
+- **The agent scores 10/10 on verdicts with 0 citation failures.** `npm run
+  verify:agent` runs 4 representative parcels, `-- --all` runs all 10, and both
+  score against `expectedMismatch`. Run it after any prompt change: a prompt
+  edit that improves one parcel can quietly flip another.
+- **The Paradise trap is handled, and the prompt is what handles it.** The agent
+  now writes, unprompted per-parcel, that low canopy on a burned lot "is what a
+  parcel looks like after it has burned and while it is still rebuilding". It
+  also does the inverse check on clean parcels, confirming a benign vegetation
+  reading is genuine low fuel rather than a burn scar, before concluding for the
+  homeowner. That behaviour comes from the trap section in
+  `lib/agent-prompt.ts`. Do not trim it.
+- **Exposing `alarmDate` fixed a wrong verdict, and no prompt change could
+  have.** Santa Monica's insurer claimed "a major wildfire within two miles in
+  the last twelve months". The Palisades Fire is 1.4 miles away and the agent
+  called the insurer correct, because `firesWithinRadius` returned only `year`
+  and a 2025 fire looks recent. The extract has held `alarmDate` all along
+  (7,279 of 7,298 features): Palisades ignited 2025-01-07, nineteen months
+  before the current date. Exposing that field plus passing today's date into
+  the first user message moved the verdict to correct with precise reasoning.
+  Lesson: when the agent hedges about a fact ("the records give the year but not
+  the month"), check whether the data actually has it before rewriting the
+  prompt.
+- **The agent skipped Mireye entirely on one parcel.** For Santa Monica it went
+  geocode, fire history, submit, and concluded without ever fetching parcel
+  measurements, because the fire record looked decisive on its own. Parcel level
+  evidence is the entire product thesis, so the prompt now requires fetching the
+  preset matching the named hazard before concluding. Watch for this class of
+  shortcut whenever a tool is optional.
+- **Preset selection is real and observable.** Across all 10 parcels the agent
+  chose `wildfire_underwrite` only and never fetched the 13 `flood_risk` fields,
+  which is the cost-control claim in `PROJECT.md` demonstrated rather than
+  asserted. `presetsChosen` and `toolCalls` come back on the API response so it
+  is checkable in the demo.
+- **A manual tool loop, not the SDK tool runner.** The loop is about forty lines
+  and keeping it explicit makes the agent's preset choice observable. Append the
+  whole `response.content` array each turn, never just the text: adaptive
+  thinking blocks must be replayed unchanged on the same model, and dropping
+  `tool_use` blocks breaks pairing with their results.
+- **Route timeout.** A run makes several sequential model calls and takes 26 to
+  45 seconds. `app/api/appeal/route.ts` sets `maxDuration = 300`; without it
+  this will time out on Vercel.
+
+- **`ReconciliationResult.mismatchFound` being a boolean was a real limitation.**
+  RESOLVED: `partiallySupported` added, see the entry below.
+
+### 2026-08-03 (Agent A: partiallySupported, and two regressions it caused)
+
+- **`partiallySupported` is orthogonal to `mismatchFound`, not a third verdict.**
+  Either verdict can be two-sided. Oxnard is false + partial (the flag is
+  justified on the area's fire record, the parcel measures benign). Santa Monica
+  has run true + partial (the twelve month claim is wrong, the megafire is
+  real). Keeping them separate avoids a three-state enum that the letter and UI
+  would each have to re-derive.
+- **A prompt edit flipped Paradise to "appeal this", which is the worst possible
+  regression.** Adding the two-sided guidance interacted with the earlier rule
+  that a materially false specific claim is a mismatch. The insurer's Paradise
+  wording includes "elevated fuel loading", which is genuinely not borne out at
+  1 percent canopy, so the agent concluded the reason was contestable for a
+  parcel sitting inside the Camp Fire perimeter. The rule had no materiality
+  test. Fixed by asking what the decision actually rests on: if removing the
+  false claim leaves no stated reason standing it is a mismatch, and if the main
+  rationale is independently supported it is not. Both cases are written into
+  `lib/agent-prompt.ts` as worked examples. **Run `npm run verify:agent -- --all`
+  after every prompt change.** This is the second time an edit that improved one
+  parcel silently broke another.
+- **The agent submitted an empty `supportingFacts` array.** Prose conclusion,
+  zero evidence, which the citation guard would then block with no useful
+  explanation. Prompt asks for four to ten facts, the tool schema sets
+  `minItems: 3`, and `lib/agent.ts` refuses an empty array at runtime and asks
+  again. One retry was not enough, the model resubmitted empty; the bound is now
+  3. All ten parcels now return 7 to 9 facts. Treat schema `minItems` as a hint,
+  never as enforcement.
+- **`partiallySupported` is less stable across runs than `mismatchFound`.**
+  Verdicts have held at 10/10 over three consecutive full runs; the two-sided
+  flag has moved on Santa Monica between runs. It changes emphasis rather than
+  the recommendation, so it is not scored, but do not build anything that
+  assumes it is deterministic.
 - **Node cannot resolve extensionless TS imports; python here has no CA bundle.**
   Two small detours. Running app `.ts` modules under `node
   --experimental-strip-types` needs the resolve hook in

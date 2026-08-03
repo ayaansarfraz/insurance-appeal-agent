@@ -232,23 +232,34 @@ export default function Home() {
           ) : (
             <section
               className={`rounded-lg border p-4 ${
-                result.reconciliation.mismatchFound
-                  ? 'border-sky-600/40 bg-sky-500/10'
-                  : 'border-amber-600/40 bg-amber-500/10'
+                result.reconciliation.partiallySupported
+                  ? 'border-violet-600/40 bg-violet-500/10'
+                  : result.reconciliation.mismatchFound
+                    ? 'border-sky-600/40 bg-sky-500/10'
+                    : 'border-amber-600/40 bg-amber-500/10'
               }`}
             >
               <h2 className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
-                {result.reconciliation.mismatchFound
-                  ? 'The stated reason is not supported by this parcel'
-                  : 'The stated reason is supported by this parcel'}
+                {/* A two-sided answer gets its own headline. Flattening it to
+                    "supported" or "not supported" is the specific way this tool
+                    would mislead someone: the detail is in the paragraph below,
+                    and the headline is what people act on. */}
+                {result.reconciliation.partiallySupported
+                  ? result.reconciliation.mismatchFound
+                    ? 'The stated reason does not hold up as written, but the underlying concern is real'
+                    : 'The stated reason holds up, but your parcel measures better than the area'
+                  : result.reconciliation.mismatchFound
+                    ? 'The stated reason is not supported by this parcel'
+                    : 'The stated reason is supported by this parcel'}
               </h2>
               <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-neutral-800 dark:text-neutral-200">
                 {result.reconciliation.explanation}
               </p>
               {!result.reconciliation.mismatchFound ? (
                 <p className="mt-2 text-xs text-neutral-700 dark:text-neutral-300">
-                  No appeal letter was generated, because there is nothing here to appeal. That is a
-                  real result, not a failure.
+                  {result.reconciliation.partiallySupported
+                    ? 'No appeal letter was generated, because the hazard finding itself holds up. The parcel level measurements above are still worth putting to your insurer when arguing the size of the adjustment.'
+                    : 'No appeal letter was generated, because there is nothing here to appeal. That is a real result, not a failure.'}
                 </p>
               ) : null}
             </section>

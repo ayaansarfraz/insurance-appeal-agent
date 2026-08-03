@@ -227,7 +227,24 @@ export function renderAppealLetter(
   );
 
   // ---- 5. The argument -------------------------------------------------
-  push('4. WHY THE STATED REASON IS NOT SUPPORTED FOR THIS PROPERTY', '');
+  // When the evidence runs both ways the heading says so. Claiming the reason
+  // is simply unsupported, over an explanation that concedes half of it, reads
+  // as overreach to the underwriter who has the same fire record and is the
+  // fastest way to have the letter dismissed.
+  push(
+    reconciliation.partiallySupported
+      ? '4. WHERE THE STATED REASON HOLDS UP AND WHERE IT DOES NOT'
+      : '4. WHY THE STATED REASON IS NOT SUPPORTED FOR THIS PROPERTY',
+    '',
+  );
+  if (reconciliation.partiallySupported) {
+    push(
+      'This section does not argue that the decision is wholly unfounded. It separates the',
+      'part of your rationale the recorded evidence supports from the part it does not, so',
+      'that the disagreement is narrowed to something specific.',
+      '',
+    );
+  }
   for (const paragraph of reconciliation.explanation.split(/\n{2,}/)) {
     const text = paragraph.trim();
     if (text) push(text, '');

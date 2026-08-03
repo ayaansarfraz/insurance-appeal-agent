@@ -207,12 +207,32 @@ export async function nearestFirePerimeter(
 export async function firesWithinRadius(
   coordinates: { lat: number; lng: number },
   radiusMiles: number = SEARCH_RADIUS_MILES,
-): Promise<Array<{ name: string; year: number; distanceMiles: number; acres: number | null }>> {
+): Promise<
+  Array<{
+    name: string;
+    year: number;
+    distanceMiles: number;
+    acres: number | null;
+    /** Ignition date, ISO yyyy-mm-dd, populated for 7,279 of the 7,298
+     *  perimeters. Exposed because a year alone cannot answer questions an
+     *  insurer's wording actually turns on: "a major fire in the last twelve
+     *  months" is a claim about a date, and the Palisades Fire of 2025 ignited
+     *  on 2025-01-07, which is outside a twelve month window read from
+     *  mid-2026 even though the year looks recent. */
+    alarmDate: string | null;
+  }>
+> {
   const { lat, lng } = coordinates;
   const { features } = loadPerimeters();
   const parcel = point([lng, lat]);
 
-  const hits: Array<{ name: string; year: number; distanceMiles: number; acres: number | null }> = [];
+  const hits: Array<{
+    name: string;
+    year: number;
+    distanceMiles: number;
+    acres: number | null;
+    alarmDate: string | null;
+  }> = [];
   for (const feature of features) {
     if (!withinPaddedBbox(feature.bbox, lng, lat, radiusMiles)) continue;
     const miles = distanceToPerimeterMiles(parcel, feature);
@@ -222,6 +242,7 @@ export async function firesWithinRadius(
       year: feature.properties.year ?? 0,
       distanceMiles: Math.round(miles * 10) / 10,
       acres: feature.properties.acres,
+      alarmDate: feature.properties.alarmDate,
     });
   }
 
