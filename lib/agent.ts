@@ -302,15 +302,29 @@ export async function runAppealAgent(
         // or cited, so it is refused once rather than accepted and blocked
         // later by the citation guard with no explanation of why.
         const facts = Array.isArray(input.supportingFacts) ? input.supportingFacts : [];
-        if (facts.length === 0 && emptyFactRetries < MAX_EMPTY_FACT_RETRIES) {
+        const explanation = String(input.explanation ?? '');
+        // Models occasionally dump tool-call XML into explanation and leave
+        // supportingFacts empty (seen on Paradise). Treat that as a malformed
+        // submit, same as an empty facts array, so the UI never shows markup.
+        const explanationLooksLikeToolDump =
+          /<\/?(?:parameter|invoke)\b/i.test(explanation);
+
+        if (
+          (facts.length === 0 || explanationLooksLikeToolDump) &&
+          emptyFactRetries < MAX_EMPTY_FACT_RETRIES
+        ) {
           emptyFactRetries += 1;
+          const why = explanationLooksLikeToolDump
+            ? 'Rejected: explanation contains tool-call markup or embedded supportingFacts JSON. ' +
+              'Put the prose conclusion only in explanation, and put each cited finding in the ' +
+              'supportingFacts array with exact source strings from the tool results.'
+            : 'Rejected: supportingFacts was empty. Resubmit with the specific measurements and ' +
+              'records your conclusion rests on, each carrying the exact source string from the ' +
+              'tool result it came from.';
           results.push({
             type: 'tool_result',
             tool_use_id: use.id,
-            content:
-              'Rejected: supportingFacts was empty. Resubmit with the specific measurements and ' +
-              'records your conclusion rests on, each carrying the exact source string from the ' +
-              'tool result it came from.',
+            content: why,
             is_error: true,
           });
           continue;
@@ -320,8 +334,8 @@ export async function runAppealAgent(
           insurerStatedReason,
           mismatchFound: Boolean(input.mismatchFound),
           partiallySupported: Boolean(input.partiallySupported),
-          explanation: String(input.explanation ?? ''),
-          supportingFacts: Array.isArray(input.supportingFacts) ? input.supportingFacts : [],
+          explanation,
+          supportingFacts: facts,
         };
         results.push({ type: 'tool_result', tool_use_id: use.id, content: 'Recorded.' });
         continue;

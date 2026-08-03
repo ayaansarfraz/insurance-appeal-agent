@@ -1,14 +1,14 @@
 /**
  * Citation display primitives.
  *
- * OWNER: Agent B.
+ * The whole premise of the project is that a claim without its provenance is
+ * worthless, so provenance is not a footnote here: it renders on the same line
+ * as the value it belongs to, always, at a size that can actually be read.
  *
- * This is the one place in the UI worth visual investment. The whole premise of
- * the project is that a claim without its provenance is worthless, so the
- * provenance is not a footnote here, it renders at the same weight as the value
- * it belongs to. The layout deliberately mirrors Mireye's own "with citation"
- * card: monospace key = value rows, the source rendered as something you can go
- * check, an explicit fetch date, and a confidence marker.
+ * This file was rebuilt for density. The previous version stacked four rows per
+ * fact (value, source, fetched, confidence) which turned a dozen honest
+ * measurements into a wall of text, and readers stopped reading. One fact is
+ * now one line. Note that the fix was layout, never dropping a citation.
  *
  * Rule for anything added to this file: if a component can render a value, it
  * must require a source and a fetchedAt to render it. Making the citation
@@ -21,114 +21,114 @@ function isUrl(s: string): boolean {
   return /^https?:\/\//i.test(s.trim());
 }
 
-/** Sources arrive either as a bare URL or as prose that may contain one. */
-function SourceValue({ source }: { source: string }) {
-  const trimmed = source.trim();
-  if (isUrl(trimmed)) {
-    return (
-      <a
-        href={trimmed}
-        target="_blank"
-        rel="noreferrer"
-        className="break-all text-sky-700 underline decoration-dotted underline-offset-2 hover:decoration-solid dark:text-sky-400"
-      >
-        [{trimmed}]
-      </a>
-    );
-  }
-  const embedded = trimmed.match(/https?:\/\/\S+/);
-  if (embedded) {
-    const before = trimmed.slice(0, embedded.index).trim();
-    return (
-      <span className="break-words">
-        [{before}{' '}
-        <a
-          href={embedded[0]}
-          target="_blank"
-          rel="noreferrer"
-          className="break-all text-sky-700 underline decoration-dotted underline-offset-2 hover:decoration-solid dark:text-sky-400"
-        >
-          {embedded[0]}
-        </a>
-        ]
-      </span>
-    );
-  }
-  return <span className="break-words">[{trimmed}]</span>;
+/** Mireye timestamps arrive as full ISO instants. The time of day is noise in a
+ *  citation line; the date is the part that matters for auditing. */
+export function asDate(fetchedAt: string): string {
+  return /^\d{4}-\d{2}-\d{2}T/.test(fetchedAt) ? fetchedAt.slice(0, 10) : fetchedAt;
 }
 
-const CONFIDENCE_TONE: Record<string, string> = {
-  high: 'border-emerald-600/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
-  medium: 'border-amber-600/40 bg-amber-500/10 text-amber-800 dark:text-amber-300',
-  low: 'border-rose-600/40 bg-rose-500/10 text-rose-800 dark:text-rose-300',
-};
+/**
+ * Sources arrive either as a bare URL, as prose, or as prose with a URL buried
+ * in it. Whichever it is, the reader gets something they can go check.
+ * An explicit sourceUrl wins: it is the field Mireye guarantees resolves.
+ */
+function SourceValue({ source, sourceUrl }: { source: string; sourceUrl?: string | null }) {
+  const trimmed = source.trim();
+  const link = sourceUrl?.trim() || (isUrl(trimmed) ? trimmed : trimmed.match(/https?:\/\/\S+/)?.[0]);
 
-export function ConfidencePill({ confidence }: { confidence: string }) {
-  const tone =
-    CONFIDENCE_TONE[confidence.toLowerCase()] ??
-    'border-neutral-500/40 bg-neutral-500/10 text-neutral-700 dark:text-neutral-300';
+  if (!link) return <span>{trimmed}</span>;
+
+  // When the source is nothing but a URL there is no prose to label it with, so
+  // the URL itself is the label.
+  const label = isUrl(trimmed) && trimmed === link ? trimmed : trimmed.replace(/\s*https?:\/\/\S+/, '');
+
   return (
-    <span className={`rounded border px-1.5 py-0.5 text-[11px] font-medium tracking-wide ${tone}`}>
+    <a
+      href={link}
+      target="_blank"
+      rel="noreferrer"
+      title={`${trimmed}\n${link}`}
+      className="text-amber underline decoration-dotted underline-offset-2 hover:decoration-solid"
+    >
+      {label || link}
+    </a>
+  );
+}
+
+/**
+ * Confidence, in one hue. High reads as a filled tag, anything else as an
+ * outline: a low confidence reading is not an error to flag in red, it is a
+ * measurement the reader should weigh less.
+ */
+export function ConfidencePill({ confidence }: { confidence: string }) {
+  const high = confidence.trim().toLowerCase() === 'high';
+  return (
+    <span
+      className={`shrink-0 rounded-[2px] px-1.5 py-px font-mono text-[10px] tracking-wide ${
+        high ? 'bg-amber-tint text-amber' : 'border border-rule text-ink-muted'
+      }`}
+    >
       {confidence}
     </span>
   );
 }
 
-/** One row of the key = value ledger. */
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-      <span className="text-neutral-500 dark:text-neutral-400">{label}</span>
-      <span className="text-neutral-400 dark:text-neutral-600">=</span>
-      <span className="min-w-0 flex-1 text-neutral-900 dark:text-neutral-100">{children}</span>
-    </div>
-  );
-}
-
 export interface CitedValueProps {
-  /** Field name as the user should read it, for example "Slope percent". */
+  /** Field name as the user should read it, for example "Slope". */
   label: string;
   /** Already formatted for display. */
   value: ReactNode;
+  /** Unit of measure, rendered with the value. "Slope 12.4" is ambiguous. */
+  unit?: string | null;
   source: string;
+  sourceUrl?: string | null;
   fetchedAt: string;
   confidence?: string;
-  /** Optional one line explanation of what the number means for an appeal. */
+  /** Optional one line explanation of what the number means for an appeal.
+   *  Use sparingly: a note on every row rebuilds the wall of text. */
   note?: string;
 }
 
 /**
- * A single fact plus everything needed to audit it. Source and fetchedAt are
- * required by the type, not optional, on purpose.
+ * One fact and everything needed to audit it, on one line. Source and fetchedAt
+ * are required by the type, not optional, on purpose.
  */
-export function CitedValue({ label, value, source, fetchedAt, confidence, note }: CitedValueProps) {
+export function CitedValue({
+  label,
+  value,
+  unit,
+  source,
+  sourceUrl,
+  fetchedAt,
+  confidence,
+  note,
+}: CitedValueProps) {
   return (
-    <div className="rounded-md border border-neutral-200 bg-white/60 p-3 font-mono text-[13px] leading-relaxed dark:border-neutral-800 dark:bg-neutral-900/40">
-      <Row label={label.toLowerCase()}>
-        <span className="font-semibold">{value}</span>
-      </Row>
-      <Row label="source">
-        <SourceValue source={source} />
-      </Row>
-      <Row label="fetched">
-        <span className="text-neutral-700 dark:text-neutral-300">{fetchedAt}</span>
-      </Row>
-      {confidence ? (
-        <Row label="confidence">
-          <ConfidencePill confidence={confidence} />
-        </Row>
-      ) : null}
+    <div className="border-b border-rule/70 py-2.5 last:border-b-0">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="w-full shrink-0 text-[13px] text-ink-muted sm:w-52">{label}</span>
+        <span className="font-mono text-[13px] font-medium text-ink">
+          {value}
+          {unit ? <span className="font-normal text-ink-muted"> {unit}</span> : null}
+        </span>
+        {confidence ? <ConfidencePill confidence={confidence} /> : null}
+        <span className="ml-auto min-w-0 max-w-full truncate font-mono text-[11px] text-ink-muted sm:max-w-[18rem]">
+          <SourceValue source={source} sourceUrl={sourceUrl} /> &middot; {asDate(fetchedAt)}
+        </span>
+      </div>
       {note ? (
-        <p className="mt-2 border-t border-neutral-200 pt-2 font-sans text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
-          {note}
-        </p>
+        <p className="mt-1.5 max-w-prose text-xs leading-relaxed text-ink-muted sm:ml-52">{note}</p>
       ) : null}
     </div>
   );
 }
 
-/** Card shell with the live capture badge, matching the Mireye treatment. */
-export function CitationCard({
+/**
+ * A labelled run of cited values inside a step card. This is deliberately not a
+ * card of its own: nesting boxes inside boxes is what made the old results
+ * screen read as a pile of containers rather than an argument.
+ */
+export function CitationGroup({
   title,
   capturedAt,
   subtitle,
@@ -140,22 +140,17 @@ export function CitationCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-neutral-200 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-950/60">
-      <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
-          {title}
-        </h2>
+    <section className="mt-5 min-w-0 first:mt-0">
+      <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-rule pb-1.5">
+        <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink">{title}</h3>
         {capturedAt ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-600/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-800 dark:text-emerald-300">
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            live · captured {capturedAt}
+          <span className="rounded-[2px] bg-amber-tint px-1.5 py-px font-mono text-[10px] text-amber">
+            captured {asDate(capturedAt)}
           </span>
         ) : null}
       </header>
-      {subtitle ? (
-        <p className="mb-3 text-xs text-neutral-600 dark:text-neutral-400">{subtitle}</p>
-      ) : null}
-      <div className="grid gap-2 sm:grid-cols-2">{children}</div>
+      {subtitle ? <p className="mt-2 max-w-prose text-xs text-ink-muted">{subtitle}</p> : null}
+      <div className="mt-1">{children}</div>
     </section>
   );
 }

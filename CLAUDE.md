@@ -237,6 +237,10 @@ Maintain a fixed list of 5-10 real addresses in `/data/demo-addresses.ts`, mixin
   request with `ENOENT ... _buildManifest.js.tmp.*`. This looks exactly like a
   broken page: Playwright reported zero inputs, zero buttons, empty DOM. Fix is
   `pkill -f "next dev"; rm -rf .next` and restart, not debugging the app.
+  Related: `next build --turbopack` has also thrown a flaky
+  `PageNotFoundError: Cannot find module for page: /_document` on App Router
+  projects with no `pages/` directory. Production `build` script uses webpack
+  (`next build`); keep `--turbopack` on `npm run dev` only.
 - **`npm run lint` was linting `.next/` and reporting 4,631 problems.** The
   script was a bare `eslint` with no scope, so it walked generated output. Now
   scoped to `eslint app lib data scripts`, against which the project is clean.
@@ -337,3 +341,51 @@ Maintain a fixed list of 5-10 real addresses in `/data/demo-addresses.ts`, mixin
   document that has to exist first, and it is the one with actual leverage. The
   DOI complaint is the follow-on; `lib/letter-template.ts` header explains the
   reasoning and the letter tells the homeowner that is the next step.
+
+### 2026-08-03 (UI redesign per redesign.md: presentation layer only)
+
+- **`truncate` plus a grid track is a page-widening trap, and it is invisible
+  until you measure.** The citation rows ellipse long dataset URLs with
+  `truncate`, which is `white-space: nowrap`, so the element's *min-content*
+  width is the full untruncated string. Grid and flex items default to
+  `min-width: auto`, so that min-content propagated all the way up and the whole
+  left column rendered 779px wide inside a 390px viewport. Nothing looked broken
+  in a screenshot, because the page simply scrolled sideways. Fix is `min-w-0`
+  on every link in the chain: the grid children in `page.tsx`, the `StepCard`
+  section and its content wrapper, the `CitationGroup` section, and the flex row
+  and source span in `CitedValue`. Check with
+  `document.documentElement.scrollWidth > window.innerWidth`, not by eye. A
+  child element reporting a width past the viewport is fine and expected when it
+  sits inside an `overflow: hidden` truncate container; only page scrollWidth
+  matters.
+- **Screenshot at a real phone width, and assert on it.** A first pass resized
+  the viewport to 390 after load and produced an 800px-wide capture, which
+  silently tested tablet, not mobile, and missed the overflow entirely. Set the
+  viewport when the page is created and assert scrollWidth in the same script.
+- **A captured API response is worth more than another live run.**
+  `page.route('**/api/appeal', fulfill)` replays one saved `AppealResponse` at
+  any viewport, instantly and for free. One live agent run costs 30 to 45
+  seconds plus Anthropic and Mireye credits, and the layout question almost
+  never needs a fresh one. Capture the JSON on the first real run and replay it
+  for everything after.
+- **Tailwind v4 utilities are layered, so an unlayered rule beats them.** The
+  inputs carry `outline-none`, and the global `:focus-visible` outline in
+  `globals.css` still wins, because `@import "tailwindcss"` puts utilities in a
+  cascade layer and unlayered rules outrank any layer. Verified by reading
+  computed `outlineColor` on the focused element rather than by reasoning about
+  specificity, which would have given the wrong answer.
+- **AGENT BUG, MITIGATED: the Paradise run leaked raw
+  tool-call markup into `explanation` and submitted zero supporting facts.** The
+  live response contained the conclusion prose followed by literal
+  `</parameter><parameter name="supportingFacts">[{...}]</parameter></invoke>`
+  text, with `supportingFacts` as an empty array. So the facts were generated,
+  they just landed inside the `explanation` string instead of the structured
+  field, and the citation guard then had nothing to verify. The verdict callout
+  correctly read "Based on 0 cited facts" and the evidence checklist correctly
+  rendered nothing, so the UI degraded honestly, but `explanationTrusted` stayed
+  true and the garbage rendered as the headline finding. Two things to chase in
+  `lib/agent.ts`: this is the same empty-`supportingFacts` failure mode already
+  logged above, so `MAX_EMPTY_FACT_RETRIES` did not catch it, and an explanation
+  containing `</parameter>` or `<invoke>` should be rejected outright the way an
+  unverifiable citation already is. Reproduced once on Paradise; not yet known
+  whether it is deterministic.

@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/**
+ * Design tokens.
+ *
+ * Five named colors and one accent, per redesign.md. The accent is the only
+ * saturated hue on the page: state is communicated through wording, border
+ * weight and fill, never by introducing a second color. If you find yourself
+ * reaching for a status green or a warning red, that is the sign to change the
+ * label instead.
+ *
+ * There is no dark variant on purpose. This surface is meant to read as an
+ * official document on paper stock, and a document does not have a dark mode.
+ * color-scheme below keeps form controls from inverting on a dark OS.
+ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@theme {
+  --color-paper: #f5f2ec;
+  --color-ink: #2a2723;
+  --color-ink-muted: #6b665d;
+  --color-rule: #ddd6c7;
+  --color-amber: #b8873d;
+  --color-amber-tint: #fbf0da;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --font-serif: var(--font-newsreader), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* The only entrance animation on the page. Results land, the verdict settles
+     in under 200ms, nothing else moves. */
+  --animate-verdict-in: verdict-in 180ms ease-out;
+
+  @keyframes verdict-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
 
+:root {
+  color-scheme: light;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* Keyboard focus has to stay visible everywhere: this gets demoed on someone
+   else's machine and tabbing through it should never lose the caret. */
+:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
