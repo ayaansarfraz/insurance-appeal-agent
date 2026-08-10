@@ -330,8 +330,11 @@ Maintain a fixed list of 5-10 real addresses in `/data/demo-addresses.ts`, mixin
   --experimental-strip-types` needs the resolve hook in
   `scripts/ts-resolve.mjs`, and `urllib` fails SSL verification in this
   environment so the download path shells out to `curl` (now just uses `fetch`).
-- **Demo address balance is 5 justified / 5 mismatch, verified against the real
-  extract.** Two of them are deliberately hard: Oxnard has 18 perimeters within
+- **Demo address balance is 6 justified / 4 mismatch, verified against the real
+  extract.** It was drafted 5/5; flipping Oxnard to `expectedMismatch: false` on
+  the evidence of the committed extract (see the entry above) made it 6/4, which
+  is correct and should not be "rebalanced" back by inventing a tenth case.
+  Two of them are deliberately hard: Oxnard has 18 perimeters within
   5 miles that are all small riverbottom grass fires (frequency real, severity
   not), and Santa Monica has a 2025 megafire 1.4 miles away across dense urban
   fabric. If the agent gets those two backwards it is counting perimeters rather
