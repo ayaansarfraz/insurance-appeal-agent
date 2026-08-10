@@ -116,8 +116,18 @@ export function auditCitations(
  * inside the 2018 Camp Fire perimeter. Blocking the document is not enough if
  * the conclusion is still displayed.
  */
+/** Tool-call XML leaked into prose (seen when the model writes parameters into
+ *  explanation instead of structured fields). Same class of failure as a
+ *  fixture: not a finding a homeowner should read. */
+function looksLikeToolMarkup(text: string): boolean {
+  return /<\/?(?:parameter|invoke)\b/i.test(text);
+}
+
 export function isExplanationTrustworthy(reconciliation: ReconciliationResult): boolean {
-  return !looksLikeFixture(reconciliation.explanation);
+  return (
+    !looksLikeFixture(reconciliation.explanation) &&
+    !looksLikeToolMarkup(reconciliation.explanation)
+  );
 }
 
 export function mayGenerateLetter(
@@ -130,6 +140,14 @@ export function mayGenerateLetter(
       reason:
         'The reconciliation explanation still contains fixture text, so the reasoning step ' +
         'has not run against live data yet. Refusing to generate a letter from it.',
+    };
+  }
+  if (looksLikeToolMarkup(reconciliation.explanation)) {
+    return {
+      allowed: false,
+      reason:
+        'The reconciliation explanation contains leaked tool-call markup, so it is not clean ' +
+        'prose a homeowner should file. Refusing to generate a letter from it.',
     };
   }
   if (audit.verifiedFacts.length === 0) {
