@@ -392,3 +392,25 @@ Maintain a fixed list of 5-10 real addresses in `/data/demo-addresses.ts`, mixin
   containing `</parameter>` or `<invoke>` should be rejected outright the way an
   unverifiable citation already is. Reproduced once on Paradise; not yet known
   whether it is deterministic.
+
+### 2026-08-10 (main: merge, and a stale-ref misdiagnosis)
+
+- **`git log origin/main` without a fetch reports a stale ref, and it produced a
+  confidently wrong status report.** A session-opening audit concluded "the
+  branch was never merged, main has no reconciliation agent at all". In fact PR
+  #2 had already merged `3dbed30` and `9c60cdc` on GitHub; the local
+  `origin/main` ref still pointed at `2556762` because nothing had fetched.
+  What was genuinely unmerged was only `c3ab453` (UI redesign plus agent
+  hardening). Run `git fetch` before reading any `origin/*` ref, and prefer
+  `git log --oneline @{u}..HEAD` over comparing against a possibly stale name.
+- **The tool-call markup leak logged on 2026-08-03 is fixed.** `lib/agent.ts:310`
+  and `lib/citation-guard.ts:123` both reject an explanation containing
+  `<parameter>` or `<invoke>`. A full `verify:agent -- --all` on 2026-08-10
+  returned 10/10 verdicts, 0 citation failures and 7 to 9 verified facts per
+  parcel, with Paradise among them. Treat that entry as closed.
+- **README had drifted to the point of being wrong in two directions.** It said
+  "implementation not yet started" long after the pipeline worked, and it
+  advertised cross-referencing "insurer rate-filing rationale", which was never
+  built (zero hits for `SERFF|rate filing` in `app lib data scripts`). Overclaim
+  in judge-facing copy is worse than the underclaim. The scope note in README
+  now states plainly that rate filings are out.
